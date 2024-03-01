@@ -1,0 +1,117 @@
+
+##############
+####UNSC embedding training
+############
+
+#####install needed libraries 
+
+library(quanteda)
+library(quanteda.textstats)
+library(quanteda.textplots)
+library(tidyverse)
+library(tidytext)
+library(text2vec)
+library(readr)
+
+
+#######import data
+
+p5 <- read_csv("C:/Users/fefos/OneDrive/Desktop/UN project/Rscripts/UNSC_database_P5_2022.csv")
+
+democracy<-  c("United States Of America", "France", "United Kingdom Of Great Britain And Northern Ireland")
+
+p5$democracy <- ifelse(p5$country %in% democracy, 1, 0)
+
+
+
+#######form a corpus 
+
+cor <- corpus(p5, text_field = "content")
+
+
+###########tokenize 
+
+
+toks <- cor %>%  tokens(remove_punct = TRUE, verbose = TRUE) %>% 
+  tokens_remove(stopwords("en")) %>% 
+  tokens_tolower()
+
+
+
+###########lemmatization
+
+lemmas <- tokens_replace(toks, pattern = lexicon::hash_lemmas$token, replacement = lexicon::hash_lemmas$lemma)
+
+
+#########OPTIONAL MAKE COLLOCATIONS#######################################################
+
+collocations <- lemmas %>%
+  textstat_collocations(min_count = 50, size = 2) %>%
+  arrange(-lambda)
+
+df_collocations <- as.data.frame(collocations)
+
+toks_comp <- tokens_compound(lemmas, pattern = collocations[collocations$lambda > 3.5,], 
+                             case_insensitive = FALSE)
+
+#########################################################################################
+
+###################feature
+
+####################################################################
+
+feats_lemmas <- dfm(lemmas, tolower=T, verbose = FALSE) %>%
+  dfm_trim(min_termfreq = 10) %>% featnames()
+
+######make feats 
+
+toks_nostop_feats_lemmas <- tokens_select(lemmas, feats_lemmas)
+
+#########training context model
+
+ncores <- parallelly::availableCores()
+
+num_bootstraps <- 40
+
+bootstrapped_samples <- vector(mode = "list", length = num_bootstraps)
+
+
+
+for (i in 1:num_bootstraps) {
+  
+  # train the GloVe model on the bootstrapped sample
+  
+  rmfcmminimal <- fcm(toks_nostop_feats_lemmas, count = "weighted",
+                      context = "window",
+                      weights = 1 / (1:13),
+                      tri = FALSE, window = 13)
+  
+  gloveminimal <- GlobalVectors$new(rank =200, x_max = 10, learning_rate = 0.008)
+  
+  wv_mainminimal <- gloveminimal$fit_transform(rmfcmminimal, n_iter = 15,
+                                               convergence_tol = 1e-3, n_threads = ncores)
+  
+  wv_contextminimal <- gloveminimal$components
+  
+  word_vectorsminimal <- wv_mainminimal + t(wv_contextminimal)
+  
+  bootstrapped_samples[[i]] <- word_vectorsminimal
+}
+
+
+
+
+averaged_embedding <- Reduce("+", bootstrapped_samples) / num_bootstraps
+
+
+
+
+saveRDS(averaged_embedding, file =
+          
+          "C:/Users/fefos/OneDrive/Desktop/UN project/New trained model to use/new_UNSC_embedding_200r_w_13_wieghted_rate_0.008_epoch_15.rds")
+
+
+m<-readRDS("C:/Users/fefos/OneDrive/Desktop/UN project/New trained model to use/new_UNSC_embedding_200r_w_13_wieghted_rate_0.008_epoch_15.rds")
+
+dim(m)
+
