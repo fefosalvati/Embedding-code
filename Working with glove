@@ -1,0 +1,17 @@
+######import glove
+
+df <- read_table("C:/Users/fefos/OneDrive/Desktop/UN project/glove.6B.200d.txt",
+                 col_names = FALSE, col_types = paste0("c", strrep("n", 200)))
+
+
+######take off the extra columns with word names
+
+embeddings_index <- as.matrix(df [-1])
+
+###rename rows
+
+row.names(embeddings_index) <- df[[1]]
+
+#######rename columns 
+
+colnames(embeddings_index) <- NULL
