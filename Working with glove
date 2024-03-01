@@ -15,3 +15,15 @@ row.names(embeddings_index) <- df[[1]]
 #######rename columns 
 
 colnames(embeddings_index) <- NULL
+
+#####extract feats
+
+f <-rownames(embeddings_index)
+
+#match
+
+featsf <- intersect(feats , f)
+
+#new glove 
+
+new_glove_300 <- embeddings_index[featsf, ]
