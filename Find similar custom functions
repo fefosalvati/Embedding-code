@@ -1,0 +1,9 @@
+
+
+
+find_similar_words <- function(word, word_vectors, n = 10) {
+  similarities <- word_vectors[word, , drop = FALSE] %>%
+    sim2(word_vectors, y = ., method = "cosine")
+  
+  similarities[,1] %>% sort(decreasing = TRUE) %>% head(n)
+}
